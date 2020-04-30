@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title>Programacion de Citas Medicas</title>
+	<!---Estilos-->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+    <style language="text/css">
+		#conversation {
+            margin: auto; 
+            width: 100%;
+            height: 60vh;
+            border: 1px solid #ccc;
+            background-color: #eee;
+            padding: 4px;
+            overflow: scroll
+        }
+		p.userRequest {
+			margin: 4px;
+			padding: 4px 10px 4px 10px;
+			border-radius: 4px;
+			min-width: 50%;
+			max-width: 85%;
+			float: left;
+			background-color: #7d7;
+		}
+
+		p.lexResponse {
+			margin: 4px;
+			padding: 4px 10px 4px 10px;
+			border-radius: 4px;
+			text-align: right;
+			min-width: 50%;
+			max-width: 85%;
+			float: right;
+			background-color: #bbf;
+			font-style: italic;
+		}
+
+		p.lexError {
+			margin: 4px;
+			padding: 4px 10px 4px 10px;
+			border-radius: 4px;
+			text-align: right;
+			min-width: 50%;
+			max-width: 85%;
+			float: right;
+			background-color: #f77;
+		}
+    </style>
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.41.0.min.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <div class="row">
+            <div class="col-12 text-center">
+                <h3>Programe su cita medica</h3>
+                <p>
+                    Utilice la siguiente ventana chat
+                </p>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-3"></div>
+            <div class="col-6">
+                <div id="conversation"></div>
+            </div>
+            <!-- <div class="col-3"></div> -->
+        </div>
+        <div class="row">&nbsp;</div>
+        <div class="row">
+            <div class="col-3"></div>
+            <div class="col-6">
+                <form class="form" id="chatform" onsubmit="return pushChat();">
+                    <input type="text" 
+                           id="wisdom"
+                           class="form-control"
+                           value=""
+                           placeholder="Escribe aqui y presiona enter">
+                </form>
+            </div>
+        </div>
+    </div>	
+    
+	<script type="text/javascript">
+		// set the focus to the input box
+		document.getElementById("wisdom").focus();
+
+		// Initialize the Amazon Cognito credentials provider
+		AWS.config.region = ''; // Region
+		AWS.config.credentials = new AWS.CognitoIdentityCredentials({
+		// Provide your Pool Id here
+			IdentityPoolId: '',
+		});
+
+		var lexruntime = new AWS.LexRuntime();
+		var lexUserId = 'chatbot-demo' + Date.now();
+		var sessionAttributes = {};
+
+		function pushChat() {
+			// if there is text to be sent...
+			var inputText = document.getElementById('wisdom');
+			if (inputText && inputText.value && inputText.value.trim().length > 0) {
+				// disable input to show we're sending it
+				var wisdom = '(Tu) ' + inputText.value.trim();
+				inputText.value = '...';
+				inputText.locked = true;
+
+				// send it to the Lex runtime
+				var params = {
+					botAlias: 'BETA',
+					botName: 'ScheduleAppointment',
+					inputText: wisdom,
+					userId: lexUserId,
+					sessionAttributes: sessionAttributes
+				};
+				showRequest(wisdom);
+				lexruntime.postText(params, function(err, data) {
+					if (err) {
+						console.log(err, err.stack);
+						showError('Error:  ' + err.message + ' (see console for details)')
+					}
+					if (data) {
+						// capture the sessionAttributes for the next cycle
+						sessionAttributes = data.sessionAttributes;
+						// show response and/or error/dialog status
+						showResponse(data);
+					}
+					// re-enable input
+					inputText.value = '';
+					inputText.locked = false;
+				});
+			}
+			// we always cancel form submission
+			return false;
+		}
+
+		function showRequest(daText) {
+
+			var conversationDiv = document.getElementById('conversation');
+			var requestPara = document.createElement("P");
+			requestPara.className = 'userRequest';
+			requestPara.appendChild(document.createTextNode(daText));
+			conversationDiv.appendChild(requestPara);
+			conversationDiv.scrollTop = conversationDiv.scrollHeight;
+		}
+
+		function showError(daText) {
+
+			var conversationDiv = document.getElementById('conversation');
+			var errorPara = document.createElement("P");
+			errorPara.className = 'lexError';
+			errorPara.appendChild(document.createTextNode(daText));
+			conversationDiv.appendChild(errorPara);
+			conversationDiv.scrollTop = conversationDiv.scrollHeight;
+		}
+
+		function showResponse(lexResponse) {
+
+			var conversationDiv = document.getElementById('conversation');
+			var responsePara = document.createElement("P");
+			responsePara.className = 'lexResponse';
+			if (lexResponse.message) {
+				responsePara.appendChild(document.createTextNode(lexResponse.message));
+				responsePara.appendChild(document.createElement('br'));
+			}
+			if (lexResponse.dialogState === 'ReadyForFulfillment') {
+				responsePara.appendChild(document.createTextNode('Ready for fulfillment'));
+				    // TODO:  show slot values
+			} else {
+                console.log(lexResponse.dialogState);
+				responsePara.appendChild(document.createTextNode('(Bot)'));
+			}
+			conversationDiv.appendChild(responsePara);
+			conversationDiv.scrollTop = conversationDiv.scrollHeight;
+		}
+	</script>
+</body>
+
+</html>
